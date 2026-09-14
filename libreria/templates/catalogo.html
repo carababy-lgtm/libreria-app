@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Catalogo – Libreria di Casa{% endblock %}
+
+{% block content %}
+
+<!-- Statistiche -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="num">{{ stats.tot or 0 }}</div>
+    <div class="lbl">Libri totali</div>
+  </div>
+  <div class="stat-card">
+    <div class="num">{{ stats.autori or 0 }}</div>
+    <div class="lbl">Autori distinti</div>
+  </div>
+  <div class="stat-card">
+    <div class="num">{{ stats.argomenti or 0 }}</div>
+    <div class="lbl">Argomenti</div>
+  </div>
+  <div class="stat-card">
+    <div class="num">{{ stats.posizionati or 0 }}</div>
+    <div class="lbl">Posizionati</div>
+  </div>
+</div>
+
+<!-- Barra ricerca + filtro stanza -->
+<div class="card" style="padding: .85rem 1.25rem; margin-bottom: 1rem;">
+  <form method="get" action="{{ url_for('catalogo') }}"
+        style="display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end;">
+    <div style="flex:1; min-width:200px;">
+      <label style="margin-bottom:.2rem;">Cerca</label>
+      <input type="text" name="q" value="{{ q }}"
+             placeholder="Titolo, autore, argomento, ISBN…">
+    </div>
+    <div style="min-width:150px;">
+      <label style="margin-bottom:.2rem;">Stanza</label>
+      <select name="stanza">
+        <option value="">(tutte)</option>
+        {% for s in stanze %}{% if s %}
+          <option value="{{ s }}" {% if stanza==s %}selected{% endif %}>{{ s }}</option>
+        {% endif %}{% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Cerca</button>
+    {% if q or stanza %}
+      <a href="{{ url_for('catalogo') }}" class="btn btn-outline">✕ Azzera</a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- Backup bar -->
+<div style="display:flex; gap:.6rem; align-items:center; margin-bottom:1rem; flex-wrap:wrap;">
+  <span style="font-size:.82rem; color:#718096;">
+    Ultimo backup: {{ backup_stato }}
+  </span>
+  <form method="post" action="{{ url_for('backup_esegui') }}" style="margin:0;">
+    <button type="submit" class="btn btn-outline btn-sm">☁ Backup ora</button>
+  </form>
+  <a href="{{ url_for('backup_scarica') }}" class="btn btn-outline btn-sm">⬇ Scarica DB</a>
+  <form method="post" action="{{ url_for('backup_ripristina') }}"
+        enctype="multipart/form-data" style="margin:0; display:flex; gap:.4rem; align-items:center;">
+    <input type="file" name="db_file" accept=".db"
+           style="font-size:.8rem; width:auto;">
+    <button type="submit" class="btn btn-outline btn-sm">⬆ Ripristina</button>
+  </form>
+</div>
+
+<!-- Tabella libri -->
+<div class="card" style="padding:0; overflow:hidden;">
+  <div style="padding:.75rem 1rem; border-bottom:1px solid #e2e8f0;
+              display:flex; justify-content:space-between; align-items:center;">
+    <strong>{{ libri|length }} libri</strong>
+    <a href="{{ url_for('nuovo') }}" class="btn btn-primary btn-sm">+ Aggiungi libro</a>
+  </div>
+
+  {% if libri %}
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Autore</th>
+          <th>Titolo</th>
+          <th>Argomento</th>
+          <th>Anno</th>
+          <th>Stanza</th>
+          <th>Ripiano</th>
+          <th style="width:90px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for libro in libri %}
+        <tr>
+          <td>{{ libro.autore or '–' }}</td>
+          <td>
+            <a href="{{ url_for('dettaglio', book_id=libro.id) }}"
+               style="color:#2c5282; text-decoration:none; font-weight:500;">
+              {{ libro.titolo }}
+            </a>
+          </td>
+          <td>
+            {% if libro.argomento %}
+              <span class="badge badge-blu">{{ libro.argomento[:30] }}</span>
+            {% else %}–{% endif %}
+          </td>
+          <td>{{ libro.anno or '–' }}</td>
+          <td>{% if libro.stanza %}<span class="badge badge-oro">{{ libro.stanza }}</span>{% else %}–{% endif %}</td>
+          <td>{{ libro.ripiano or '–' }}</td>
+          <td>
+            <a href="{{ url_for('modifica', book_id=libro.id) }}"
+               class="btn btn-outline btn-sm">✏</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="padding:2rem; text-align:center; color:#718096;">
+    Nessun libro trovato.
+    <a href="{{ url_for('nuovo') }}">Aggiungine uno.</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if dist_stanze %}
+<div style="margin-top:1rem; display:flex; gap:.5rem; flex-wrap:wrap; align-items:center;">
+  <span style="font-size:.82rem; color:#718096;">Distribuzione:</span>
+  {% for s in dist_stanze %}
+    <a href="{{ url_for('catalogo', stanza=s.stanza) }}"
+       class="badge badge-oro" style="text-decoration:none;">
+      {{ s.stanza }} ({{ s.n }})
+    </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

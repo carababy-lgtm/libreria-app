@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}{{ libro.titolo }} – Libreria{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:1rem;">
+  <a href="{{ url_for('catalogo') }}" style="color:#2c5282; font-size:.9rem;">
+    ← Torna al catalogo
+  </a>
+</div>
+
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:.75rem;">
+    <div>
+      <h1 style="font-size:1.4rem; color:#1e3a5f; margin-bottom:.25rem;">
+        {{ libro.titolo }}
+      </h1>
+      {% if libro.autore %}
+        <p style="color:#4a5568; font-size:1rem;">{{ libro.autore }}</p>
+      {% endif %}
+    </div>
+    <div style="display:flex; gap:.5rem;">
+      <a href="{{ url_for('modifica', book_id=libro.id) }}"
+         class="btn btn-outline btn-sm">✏ Modifica</a>
+      <form method="post" action="{{ url_for('elimina', book_id=libro.id) }}"
+            onsubmit="return confirm('Eliminare «{{ libro.titolo }}»?')">
+        <button type="submit" class="btn btn-danger btn-sm">🗑 Elimina</button>
+      </form>
+    </div>
+  </div>
+
+  <hr style="border:none; border-top:1px solid #e2e8f0; margin:1rem 0;">
+
+  <div class="form-row">
+    <div>
+      <p style="font-size:.8rem; color:#718096; margin-bottom:.2rem;">Argomento</p>
+      <p>{{ libro.argomento or '–' }}</p>
+    </div>
+    <div>
+      <p style="font-size:.8rem; color:#718096; margin-bottom:.2rem;">Anno</p>
+      <p>{{ libro.anno or '–' }}</p>
+    </div>
+    <div>
+      <p style="font-size:.8rem; color:#718096; margin-bottom:.2rem;">Editore</p>
+      <p>{{ libro.editore or '–' }}</p>
+    </div>
+    <div>
+      <p style="font-size:.8rem; color:#718096; margin-bottom:.2rem;">ISBN</p>
+      <p>{{ libro.isbn or '–' }}</p>
+    </div>
+  </div>
+
+  {% if libro.descrizione %}
+  <div style="margin-top:1rem;">
+    <p style="font-size:.8rem; color:#718096; margin-bottom:.4rem;">Descrizione</p>
+    <p style="line-height:1.7; color:#2d3748;">{{ libro.descrizione }}</p>
+  </div>
+  {% endif %}
+
+  <hr style="border:none; border-top:1px solid #e2e8f0; margin:1rem 0;">
+
+  <div class="form-row">
+    <div>
+      <p style="font-size:.8rem; color:#718096; margin-bottom:.2rem;">Posizione</p>
+      <p>
+        {% if libro.stanza %}
+          <span class="badge badge-oro">{{ libro.stanza }}</span>
+        {% endif %}
+        {% if libro.ripiano %}
+          <span class="badge badge-blu">{{ libro.ripiano }}</span>
+        {% endif %}
+        {% if not libro.stanza and not libro.ripiano %}–{% endif %}
+      </p>
+    </div>
+    {% if libro.note %}
+    <div>
+      <p style="font-size:.8rem; color:#718096; margin-bottom:.2rem;">Note</p>
+      <p>{{ libro.note }}</p>
+    </div>
+    {% endif %}
+    <div>
+      <p style="font-size:.8rem; color:#718096; margin-bottom:.2rem;">Inserito il</p>
+      <p>{{ libro.data_ins or '–' }}</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

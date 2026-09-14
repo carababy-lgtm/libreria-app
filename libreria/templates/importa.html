@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Importa libri – Libreria{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:1rem;">
+  <a href="{{ url_for('catalogo') }}" style="color:#2c5282; font-size:.9rem;">
+    ← Torna al catalogo
+  </a>
+</div>
+
+<div class="card">
+  <h2 style="font-size:1.2rem; color:#1e3a5f; margin-bottom:.5rem;">
+    Importa libri da foto
+  </h2>
+  <p style="color:#4a5568; font-size:.9rem; margin-bottom:1.25rem;">
+    Guarda la foto della libreria e scrivi qui i libri che vedi,
+    uno per riga. Formato: <code>Autore | Titolo</code>
+    oppure solo il <code>Titolo</code> se l'autore non è visibile.
+    Il sistema cercherà online i dati mancanti e tradurrà le descrizioni in italiano.
+  </p>
+
+  <form method="post">
+    <div class="form-group">
+      <label>Libri (uno per riga)</label>
+      <textarea name="righe" rows="12"
+                placeholder="Paulo Coelho | L'alchimista&#10;Douglas Hofstadter | Gödel, Escher, Bach&#10;Intelligenza emotiva&#10;…"></textarea>
+    </div>
+
+    <div class="form-row" style="margin-bottom:1rem;">
+      <div class="form-group">
+        <label>Stanza</label>
+        <select name="stanza">
+          {% for s in stanze %}
+            <option value="{{ s }}">{{ s if s else '– non specificata –' }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Ripiano</label>
+        <select name="ripiano">
+          {% for r in ripiani %}
+            <option value="{{ r }}">{{ r if r else '– non specificato –' }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <p style="font-size:.82rem; color:#718096; margin-bottom:.85rem;">
+      ⚠ I libri già presenti nel DB vengono ignorati automaticamente.
+      La ricerca online può richiedere qualche secondo per ogni libro.
+    </p>
+
+    <button type="submit" class="btn btn-success">
+      ▶ Importa
+    </button>
+  </form>
+</div>
+
+{% if risultati %}
+<div class="card" style="margin-top:1rem;">
+  <h3 style="font-size:1rem; margin-bottom:.85rem; color:#1e3a5f;">
+    Risultati importazione
+  </h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Titolo</th>
+        <th>Autore</th>
+        <th>Stato</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in risultati %}
+      <tr>
+        <td>{{ r.titolo }}</td>
+        <td>{{ r.autore or '–' }}</td>
+        <td>
+          <span class="badge badge-{% if r.classe=='success' %}verde{% elif r.classe=='warning' %}oro{% else %}blu{% endif %}">
+            {{ r.stato }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p style="margin-top:.75rem; font-size:.85rem; color:#4a5568;">
+    {{ risultati|length }} libri elaborati.
+    <a href="{{ url_for('catalogo') }}">Vai al catalogo →</a>
+  </p>
+</div>
+{% endif %}
+
+{% endblock %}

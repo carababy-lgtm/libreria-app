@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}{{ titolo_pag }} – Libreria{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:1rem;">
+  <a href="{{ url_for('catalogo') }}" style="color:#2c5282; font-size:.9rem;">
+    ← Torna al catalogo
+  </a>
+</div>
+
+<div class="card">
+  <h2 style="font-size:1.2rem; color:#1e3a5f; margin-bottom:1.25rem;">
+    {{ titolo_pag }}
+  </h2>
+
+  <!-- Ricerca online -->
+  <div style="background:#ebf4ff; border-radius:8px; padding:1rem; margin-bottom:1.25rem;">
+    <p style="font-size:.85rem; color:#2c5282; font-weight:500; margin-bottom:.5rem;">
+      Cerca online per compilare automaticamente i campi
+    </p>
+    <div style="display:flex; gap:.6rem; flex-wrap:wrap;">
+      <input type="text" id="lookup-q"
+             placeholder="Titolo, autore o ISBN…"
+             style="flex:1; min-width:200px;"
+             value="{{ libro.titolo or '' }}">
+      <button type="button" onclick="cercaOnline()" class="btn btn-primary">
+        🔍 Cerca
+      </button>
+    </div>
+    <p id="lookup-stato" style="font-size:.82rem; margin-top:.4rem; color:#4a5568;"></p>
+  </div>
+
+  <!-- Form principale -->
+  <form method="post">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Titolo *</label>
+        <input type="text" name="titolo" id="f-titolo"
+               value="{{ libro.titolo or '' }}" required>
+      </div>
+      <div class="form-group">
+        <label>Autore</label>
+        <input type="text" name="autore" id="f-autore"
+               value="{{ libro.autore or '' }}">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Argomento / Genere</label>
+        <input type="text" name="argomento" id="f-argomento"
+               value="{{ libro.argomento or '' }}">
+      </div>
+      <div class="form-group">
+        <label>Anno</label>
+        <input type="text" name="anno" id="f-anno"
+               value="{{ libro.anno or '' }}" style="max-width:100px;">
+      </div>
+      <div class="form-group">
+        <label>Editore</label>
+        <input type="text" name="editore" id="f-editore"
+               value="{{ libro.editore or '' }}">
+      </div>
+      <div class="form-group">
+        <label>ISBN</label>
+        <input type="text" name="isbn" id="f-isbn"
+               value="{{ libro.isbn or '' }}">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Descrizione</label>
+      <textarea name="descrizione" id="f-descrizione"
+                rows="4">{{ libro.descrizione or '' }}</textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Stanza</label>
+        <select name="stanza" id="f-stanza">
+          {% for s in stanze %}
+            <option value="{{ s }}"
+              {% if libro.stanza == s %}selected{% endif %}>
+              {{ s if s else '– nessuna –' }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Ripiano</label>
+        <select name="ripiano" id="f-ripiano">
+          {% for r in ripiani %}
+            <option value="{{ r }}"
+              {% if libro.ripiano == r %}selected{% endif %}>
+              {{ r if r else '– nessuno –' }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Note</label>
+        <input type="text" name="note" value="{{ libro.note or '' }}">
+      </div>
+    </div>
+
+    <div style="display:flex; gap:.75rem; margin-top:.5rem;">
+      <button type="submit" class="btn btn-success">💾 Salva</button>
+      <a href="{{ url_for('catalogo') }}" class="btn btn-outline">Annulla</a>
+    </div>
+  </form>
+</div>
+
+<script>
+async function cercaOnline() {
+  const q = document.getElementById("lookup-q").value.trim();
+  if (!q) return;
+  const stato = document.getElementById("lookup-stato");
+  stato.textContent = "⏳ Ricerca in corso…";
+  try {
+    const r   = await fetch(`/api/lookup?q=${encodeURIComponent(q)}`);
+    const res = await r.json();
+    if (res.ok) {
+      const d = res.data;
+      if (d.titolo)      document.getElementById("f-titolo").value      = d.titolo;
+      if (d.autore)      document.getElementById("f-autore").value      = d.autore;
+      if (d.argomento)   document.getElementById("f-argomento").value   = d.argomento;
+      if (d.anno)        document.getElementById("f-anno").value        = d.anno;
+      if (d.editore)     document.getElementById("f-editore").value     = d.editore;
+      if (d.isbn)        document.getElementById("f-isbn").value        = d.isbn;
+      if (d.descrizione) document.getElementById("f-descrizione").value = d.descrizione;
+      stato.textContent = `✅ Dati trovati da ${res.source}`;
+      stato.style.color = "#276749";
+    } else {
+      stato.textContent = "❌ Nessun risultato online. Compila manualmente.";
+      stato.style.color = "#c53030";
+    }
+  } catch(e) {
+    stato.textContent = "Errore di connessione.";
+    stato.style.color = "#c53030";
+  }
+}
+document.getElementById("lookup-q").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); cercaOnline(); }
+});
+</script>
+{% endblock %}
