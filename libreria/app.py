@@ -1,13 +1,7 @@
 #!/usr/bin/env python3
-"""
-GESTIONE LIBRERIA DI CASA  –  Web App (Flask)
-Accesso protetto da password · Backup GitHub · Lookup online con traduzione
-"""
-
-import os, base64, threading
+import os, io, csv, threading
 from flask import (Flask, render_template, request, redirect,
                    url_for, session, jsonify, send_file, flash)
-from werkzeug.utils import secure_filename
 
 from config   import PASSWORD, STANZE, RIPIANI, DB_PATH
 from database import (init_db, db_all, db_search, db_get,
@@ -31,6 +25,7 @@ def login():
     errore = ""
     if request.method == "POST":
         if request.form.get("password") == PASSWORD:
+            session.clear()
             session["auth"] = True
             return redirect(url_for("catalogo"))
         errore = "Password errata."
@@ -44,7 +39,7 @@ def logout():
 
 
 # ══════════════════════════════════════════════════════════
-#  CATALOGO (pagina principale)
+#  CATALOGO
 # ══════════════════════════════════════════════════════════
 @app.route("/")
 def index():
@@ -57,9 +52,7 @@ def catalogo():
         return redirect(url_for("login"))
     q      = request.args.get("q", "").strip()
     stanza = request.args.get("stanza", "")
-    rows   = db_search(q, stanza) if q else db_all()
-    if stanza and stanza != "(tutte)" and not q:
-        rows = [r for r in rows if r.get("stanza") == stanza]
+    rows   = db_search(q, stanza) if (q or stanza) else db_all()
     stats, dist_stanze = db_stats()
     return render_template("catalogo.html",
                            libri=rows, q=q, stanza=stanza,
@@ -69,7 +62,7 @@ def catalogo():
 
 
 # ══════════════════════════════════════════════════════════
-#  DETTAGLIO LIBRO
+#  DETTAGLIO
 # ══════════════════════════════════════════════════════════
 @app.route("/libro/<int:book_id>")
 def dettaglio(book_id):
@@ -83,7 +76,7 @@ def dettaglio(book_id):
 
 
 # ══════════════════════════════════════════════════════════
-#  AGGIUNGI / MODIFICA LIBRO
+#  AGGIUNGI / MODIFICA
 # ══════════════════════════════════════════════════════════
 @app.route("/nuovo", methods=["GET", "POST"])
 def nuovo():
@@ -96,10 +89,10 @@ def nuovo():
             return render_template("form_libro.html",
                                    libro={}, stanze=STANZE, ripiani=RIPIANI,
                                    titolo_pag="Nuovo libro")
-        data = _form_to_dict(request.form)
-        db_insert(data)
+        db_insert(_form_to_dict(request.form))
         flash(f"«{titolo}» aggiunto.", "success")
         return redirect(url_for("catalogo"))
+    # GET — campi sempre vuoti
     return render_template("form_libro.html",
                            libro={}, stanze=STANZE, ripiani=RIPIANI,
                            titolo_pag="Nuovo libro")
@@ -170,60 +163,118 @@ def api_lookup():
 
 
 # ══════════════════════════════════════════════════════════
-#  IMPORTAZIONE DA FOTO
+#  IMPORTAZIONE DA FILE EXCEL / CSV
 # ══════════════════════════════════════════════════════════
 @app.route("/importa", methods=["GET", "POST"])
 def importa():
     if not logged_in():
         return redirect(url_for("login"))
     if request.method == "GET":
-        return render_template("importa.html", stanze=STANZE, ripiani=RIPIANI)
+        return render_template("importa.html", stanze=STANZE, ripiani=RIPIANI,
+                               risultati=None, elaborati=0)
 
-    # POST: ricezione lista libri da importare
-    righe   = request.form.get("righe", "").strip().splitlines()
-    stanza  = request.form.get("stanza", "").strip()
-    ripiano = request.form.get("ripiano", "").strip()
+    f = request.files.get("file")
+    if not f or f.filename == "":
+        flash("Seleziona un file CSV o Excel.", "warning")
+        return render_template("importa.html", stanze=STANZE, ripiani=RIPIANI,
+                               risultati=None, elaborati=0)
+
+    stanza_def  = request.form.get("stanza", "").strip()
+    ripiano_def = request.form.get("ripiano", "").strip()
+
+    # Leggi righe dal file
+    righe = _leggi_file(f)
+    if righe is None:
+        flash("Formato file non supportato. Usa CSV o Excel (.xlsx).", "danger")
+        return render_template("importa.html", stanze=STANZE, ripiani=RIPIANI,
+                               risultati=None, elaborati=0)
 
     risultati = []
     for riga in righe:
-        riga = riga.strip()
-        if not riga:
-            continue
-        # formato atteso: "Autore | Titolo" oppure solo "Titolo"
-        if "|" in riga:
-            autore, titolo = [p.strip() for p in riga.split("|", 1)]
-        else:
-            autore, titolo = "", riga
-
+        titolo  = str(riga.get("titolo", "")).strip()
         if not titolo:
             continue
+        autore  = str(riga.get("autore",  "")).strip()
+        anno    = str(riga.get("anno",    "")).strip()
+        editore = str(riga.get("editore", "")).strip()
+        stanza  = str(riga.get("stanza",  "")).strip() or stanza_def
+        ripiano = str(riga.get("ripiano", "")).strip() or ripiano_def
 
         if gia_presente(titolo):
             risultati.append({"titolo": titolo, "autore": autore,
                                "stato": "già presente", "classe": "warning"})
             continue
 
+        # Lookup online
         extra, source = lookup_espanso(autore, titolo)
+
         data = {
             "titolo":      titolo,
-            "autore":      autore,
+            "autore":      autore or (extra.get("autore", "") if extra else ""),
             "argomento":   extra.get("argomento", "") if extra else "",
             "descrizione": extra.get("descrizione", "") if extra else "",
-            "anno":        extra.get("anno", "") if extra else "",
-            "editore":     extra.get("editore", "") if extra else "",
+            "anno":        anno or (extra.get("anno", "") if extra else ""),
+            "editore":     editore or (extra.get("editore", "") if extra else ""),
             "isbn":        extra.get("isbn", "") if extra else "",
             "stanza":      stanza,
             "ripiano":     ripiano,
-            "note":        "posizione da confermare" if not stanza else "",
+            "note":        "",
         }
         db_insert(data)
         stato  = f"importato ({source})" if extra else "importato (senza dati online)"
         classe = "success" if extra else "warning"
-        risultati.append({"titolo": titolo, "autore": autore,
+        risultati.append({"titolo": titolo, "autore": data["autore"],
                            "stato": stato, "classe": classe})
 
     return render_template("importa.html", stanze=STANZE, ripiani=RIPIANI,
-                           risultati=risultati)
+                           risultati=risultati, elaborati=len(risultati))
+
+
+def _leggi_file(f):
+    """Legge CSV o XLSX e restituisce lista di dict con chiavi minuscole."""
+    nome = f.filename.lower()
+    try:
+        if nome.endswith(".csv"):
+            contenuto = f.read().decode("utf-8-sig")
+            reader = csv.DictReader(io.StringIO(contenuto))
+            return [{k.strip().lower(): v for k, v in row.items()} for row in reader]
+        elif nome.endswith(".xlsx") or nome.endswith(".xls"):
+            import openpyxl
+            wb = openpyxl.load_workbook(io.BytesIO(f.read()), data_only=True)
+            ws = wb.active
+            intestazioni = [str(c.value).strip().lower() if c.value else "" 
+                           for c in next(ws.iter_rows(min_row=1, max_row=1))]
+            righe = []
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                d = {intestazioni[i]: (str(v).strip() if v is not None else "")
+                     for i, v in enumerate(row)}
+                righe.append(d)
+            return righe
+        else:
+            return None
+    except Exception:
+        return None
+
+
+# ══════════════════════════════════════════════════════════
+#  SCARICA TEMPLATE CSV
+# ══════════════════════════════════════════════════════════
+@app.route("/template-csv")
+def template_csv():
+    if not logged_in():
+        return redirect(url_for("login"))
+    output = io.StringIO()
+    w = csv.writer(output)
+    w.writerow(["titolo", "autore", "anno", "editore", "stanza", "ripiano"])
+    w.writerow(["L'alchimista", "Paulo Coelho", "1988", "Bompiani", "STUDIO", "A1"])
+    w.writerow(["Gomorra", "Roberto Saviano", "", "", "STUDIO", "B2"])
+    output.seek(0)
+    return send_file(
+        io.BytesIO(output.getvalue().encode("utf-8-sig")),
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name="template_libri.csv"
+    )
 
 
 # ══════════════════════════════════════════════════════════
@@ -249,11 +300,21 @@ def backup_scarica():
 def backup_ripristina():
     if not logged_in():
         return redirect(url_for("login"))
-    # ripristino da file caricato
     f = request.files.get("db_file")
     if f and f.filename.endswith(".db"):
-        f.save(DB_PATH)
-        flash("DB ripristinato dal file caricato.", "success")
+        import sqlite3, tempfile, os
+        tmp = tempfile.mktemp(suffix=".db")
+        f.save(tmp)
+        try:
+            conn = sqlite3.connect(tmp)
+            conn.execute("SELECT COUNT(*) FROM libri")
+            conn.close()
+            os.replace(tmp, DB_PATH)
+            flash("DB ripristinato dal file caricato.", "success")
+        except Exception:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+            flash("File DB non valido.", "danger")
     else:
         ok, msg = ripristina_da_github()
         flash(msg, "success" if ok else "danger")

@@ -10,25 +10,31 @@
 
 <div class="card">
   <h2 style="font-size:1.2rem; color:#1e3a5f; margin-bottom:.5rem;">
-    Importa libri da foto
+    Importa libri da file
   </h2>
-  <p style="color:#4a5568; font-size:.9rem; margin-bottom:1.25rem;">
-    Guarda la foto della libreria e scrivi qui i libri che vedi,
-    uno per riga. Formato: <code>Autore | Titolo</code>
-    oppure solo il <code>Titolo</code> se l'autore non è visibile.
-    Il sistema cercherà online i dati mancanti e tradurrà le descrizioni in italiano.
+  <p style="color:#4a5568; font-size:.9rem; margin-bottom:1rem;">
+    Carica un file <strong>CSV</strong> o <strong>Excel (.xlsx)</strong> con le colonne:
+    <code>titolo</code>, <code>autore</code>, <code>anno</code>, <code>editore</code>,
+    <code>stanza</code>, <code>ripiano</code>.
+    Solo <code>titolo</code> è obbligatorio. I dati mancanti (argomento, descrizione, ISBN)
+    vengono recuperati automaticamente online e tradotti in italiano.
+  </p>
+  <p style="margin-bottom:1.25rem;">
+    <a href="{{ url_for('template_csv') }}" class="btn btn-outline btn-sm">
+      ⬇ Scarica template CSV di esempio
+    </a>
   </p>
 
-  <form method="post">
+  <form method="post" enctype="multipart/form-data">
     <div class="form-group">
-      <label>Libri (uno per riga)</label>
-      <textarea name="righe" rows="12"
-                placeholder="Paulo Coelho | L'alchimista&#10;Douglas Hofstadter | Gödel, Escher, Bach&#10;Intelligenza emotiva&#10;…"></textarea>
+      <label>File CSV o Excel</label>
+      <input type="file" name="file" accept=".csv,.xlsx,.xls" required
+             style="padding:.4rem 0;">
     </div>
 
     <div class="form-row" style="margin-bottom:1rem;">
       <div class="form-group">
-        <label>Stanza</label>
+        <label>Stanza predefinita <span style="color:#718096;font-weight:400;">(usata se non presente nel file)</span></label>
         <select name="stanza">
           {% for s in stanze %}
             <option value="{{ s }}">{{ s if s else '– non specificata –' }}</option>
@@ -36,7 +42,7 @@
         </select>
       </div>
       <div class="form-group">
-        <label>Ripiano</label>
+        <label>Ripiano predefinito <span style="color:#718096;font-weight:400;">(usato se non presente nel file)</span></label>
         <select name="ripiano">
           {% for r in ripiani %}
             <option value="{{ r }}">{{ r if r else '– non specificato –' }}</option>
@@ -46,47 +52,50 @@
     </div>
 
     <p style="font-size:.82rem; color:#718096; margin-bottom:.85rem;">
-      ⚠ I libri già presenti nel DB vengono ignorati automaticamente.
+      I libri già presenti nel DB vengono ignorati automaticamente.
       La ricerca online può richiedere qualche secondo per ogni libro.
     </p>
 
-    <button type="submit" class="btn btn-success">
-      ▶ Importa
-    </button>
+    <button type="submit" class="btn btn-success">▶ Importa</button>
   </form>
 </div>
 
-{% if risultati %}
+{% if risultati is not none %}
 <div class="card" style="margin-top:1rem;">
   <h3 style="font-size:1rem; margin-bottom:.85rem; color:#1e3a5f;">
-    Risultati importazione
+    Risultati — {{ elaborati }} libri elaborati
   </h3>
-  <table>
-    <thead>
-      <tr>
-        <th>Titolo</th>
-        <th>Autore</th>
-        <th>Stato</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in risultati %}
-      <tr>
-        <td>{{ r.titolo }}</td>
-        <td>{{ r.autore or '–' }}</td>
-        <td>
-          <span class="badge badge-{% if r.classe=='success' %}verde{% elif r.classe=='warning' %}oro{% else %}blu{% endif %}">
-            {{ r.stato }}
-          </span>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  {% if risultati %}
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Titolo</th>
+          <th>Autore</th>
+          <th>Stato</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in risultati %}
+        <tr>
+          <td>{{ r.titolo }}</td>
+          <td>{{ r.autore or '–' }}</td>
+          <td>
+            <span class="badge badge-{% if r.classe=='success' %}verde{% elif r.classe=='warning' %}oro{% else %}blu{% endif %}">
+              {{ r.stato }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
   <p style="margin-top:.75rem; font-size:.85rem; color:#4a5568;">
-    {{ risultati|length }} libri elaborati.
     <a href="{{ url_for('catalogo') }}">Vai al catalogo →</a>
   </p>
+  {% else %}
+  <p style="color:#718096;">Nessun libro elaborato. Verifica che il file non sia vuoto.</p>
+  {% endif %}
 </div>
 {% endif %}
 
